@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<code>
+  <![CDATA[using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Reflection;
+using System.Threading.Tasks;
+using System.Web.Http;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
+using Microsoft.Extensions.Logging;
+using Microsoft.OpenApi.Models;
+using Newtonsoft.Json;
+using Azure.Function.Abstractions.StaticHelpers;
+using Azure.Function.Abstractions.Models.Requests;
+using Azure.Function.Abstractions.Models.Entitys;
+using Azure.Function.Repository.Services;
+using Azure.Function.Abstractions.Models.Global;
+using Azure.Function.Services.API.v1.StaticHelpers;
+
+namespace UBC.Pathways.Azure.KeyCard.Function.Services.API.v1.Users
+{
+    public class api_Get$EntityTableRowType$sByPostQuery
+    {
+
+        private readonly ProcessOperations _processOperations;
+
+        public api_Get$EntityTableRowType$sByPostQuery(
+            ProcessOperations processOperations)
+        {
+            this._processOperations = processOperations;
+        }
+
+        [FunctionName("api_Get$EntityTableRowType$sByPostQuery")]
+        [OpenApiOperation(operationId: "Run", tags: new[] { "$EntityTableRowType$s" },Description = "Returns all ($EntityTableRowType$ rows) based on json properties and values provided in the body.")]
+        [OpenApiSecurity("function_key", SecuritySchemeType.ApiKey, Name = "code", In = OpenApiSecurityLocationType.Query)]
+        [OpenApiRequestBody(contentType: "application/json", bodyType: typeof($EntityTableRowType$QueryRequest),
+            Description = "Query definitions: ( [All: means exact match/equal] [Partial: Ex: 'John'] [Any: means of available choices] )")]
+
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(OperationResponse), Example = typeof(OperationResponse200Example), Description = "Request was successful.")]
+
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(OperationResponse), Example = typeof(OperationResponse401Example), Description = "Unauthorized access due to invalid token.")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.Forbidden, contentType: "application/json", bodyType: typeof(OperationResponse), Example = typeof(OperationResponse403Example), Description = "Unauthorized access due to invalid API access key.")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.InternalServerError, contentType: "application/json", bodyType: typeof(OperationResponse), Example = typeof(OperationResponse500Example), Description = "Internal Server Error. See Error in response for details.")]
+        public async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "generictableapi/v1/$EntityTableRowType$s/query/")] HttpRequest httpRequest, ILogger log)
+        {
+            log.LogInformation("C# HTTP trigger function processed a request.");
+
+            var verboseErrors =
+               !string.IsNullOrEmpty(httpRequest.Headers["verboseErrors"]) && httpRequest.Headers["verboseErrors"] == "true";
+            var verboseAzureResponse =
+                !string.IsNullOrEmpty(httpRequest.Headers["verboseAzureResponse"]) && httpRequest.Headers["verboseAzureResponse"] == "true";
+
+            OperationResponse processOperationsResponse = null;
+
+            try
+            {
+
+                // parse the body
+                string requestBodyString = await new StreamReader(httpRequest.Body).ReadToEndAsync();
+
+                var executedResults = await GenericQueryResponse.ExecuteQueryFunction<$EntityTableRowType$Entity, $EntityTableRowType$QueryRequest>(
+                    this._processOperations, processOperationsResponse, requestBodyString, verboseErrors);
+
+                if (executedResults is OperationResponse)
+                {
+                    processOperationsResponse = (OperationResponse)executedResults;
+                }
+
+                if (executedResults is ExceptionResult)
+                {
+                    return (ExceptionResult)executedResults;
+                }
+
+                if (!verboseAzureResponse)
+                {
+                    processOperationsResponse.AzureResponseBodyJson = "(Header Details suppressed -> 'Header: verboseAzureResponse Value: false' .";
+                }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("ErrorSourceMethod", MethodBase.GetCurrentMethod().DeclaringType.FullName);
+                return HandleResponseErrors.FormatControllerErrors(500, ex, null, verboseErrors);
+            }
+
+            return new ObjectResult(processOperationsResponse);
+        }
+    }
+}
+]]>
+</code>

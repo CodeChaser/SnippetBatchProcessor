@@ -1,0 +1,106 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<code>
+  <![CDATA[
+using System.IO;
+using System.Net;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
+using Microsoft.Extensions.Logging;
+using Microsoft.OpenApi.Models;
+using Newtonsoft.Json;
+using Azure.Function.Repository.Services;
+using Azure.Function.Abstractions.Models.Entitys;
+using System;
+using Azure.Function.Abstractions.StaticHelpers;
+using System.Reflection;
+using Azure.Function.Abstractions.Models.Requests;
+using Azure.Function.Abstractions.Models.Global;
+
+namespace UBC.Pathways.Azure.KeyCard.Function.Services.API.v1.Users
+{
+    public class api_Post$EntityTableRowType$Upsert
+    {
+
+        private readonly ProcessOperations _processOperations;
+
+        public api_Post$EntityTableRowType$Upsert(
+            ProcessOperations processOperations)
+        {
+            this._processOperations = processOperations;
+        }
+
+        [FunctionName("api_Post$EntityTableRowType$Upsert")]
+        [OpenApiOperation(operationId: "Run", tags: new[] { "$EntityTableRowType$s" }, Description = "Inserts or updates $EntityTableRowType$ row with a (['RowKey' = 'Null'] = new row) and (['RowKey' = 'Guid'] = update). (['Active': = 0 ] = SoftDelete).")]
+        [OpenApiSecurity("function_key", SecuritySchemeType.ApiKey, Name = "code", In = OpenApiSecurityLocationType.None)]
+        [OpenApiRequestBody(contentType: "application/json", bodyType: typeof($EntityTableRowType$UpsertRequest), 
+            Description = "New/Update User: ( [New: RowKey = null] [Update:RowKey Guid, include all original values, change what is needed. Just like EF.] )", Required = true)]
+
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.NoContent, contentType: "application/json", bodyType: typeof(OperationResponse), Example = typeof(OperationResponse204Example), Description = "Request was successful.")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.BadRequest, contentType: "application/json", bodyType: typeof(OperationResponse), Example = typeof(OperationResponse400Example), Description = "Body json missing expected Json Key/value pair is missing or wrong type.")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(OperationResponse), Example = typeof(OperationResponse401Example), Description = "Unauthorized access due to invalid token.")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.Forbidden, contentType: "application/json", bodyType: typeof(OperationResponse), Example = typeof(OperationResponse403Example), Description = "Unauthorized access due to invalid API access key.")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.InternalServerError, contentType: "application/json", bodyType: typeof(OperationResponse), Example = typeof(OperationResponse500Example), Description = "Internal Server Error. See Error in response for details.")]
+        public async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "generictableapi/v1/$EntityTableRowType$s/upsert")] HttpRequest httpRequest,  ILogger log)
+        {
+            log.LogInformation("C# HTTP trigger function processed an Upsert Operation request.");
+
+            var verboseErrors =
+                !string.IsNullOrEmpty(httpRequest.Headers["verboseErrors"]) && httpRequest.Headers["verboseErrors"] == "true";
+            var verboseAzureResponse =
+                !string.IsNullOrEmpty(httpRequest.Headers["verboseAzureResponse"]) && httpRequest.Headers["verboseAzureResponse"] == "true";
+
+            OperationResponse processOperationsResponse;
+
+            try
+            {
+              
+                var hasErrors = false;
+
+                // parse the body
+                string requestBody = await new StreamReader(httpRequest.Body).ReadToEndAsync();
+
+                // attempt to convert to json
+                var upsertObject = JsonConvert.DeserializeObject<$EntityTableRowType$UpsertRequest>(requestBody);
+
+                processOperationsResponse = await this._processOperations
+                    .ProcessUpsertRequestAsync<$EntityTableRowType$UpsertRequest, $EntityTableRowType$Entity>(upsertObject);
+
+                // no issues lets continue processing
+                if (string.IsNullOrEmpty(processOperationsResponse.HasError))
+                {
+
+                    if (!verboseAzureResponse)
+                    {
+                        processOperationsResponse.AzureResponseBodyJson = "[Header Details suppressed] -> ('Header: verboseAzureResponse Value: false' or missing.)";
+                    }
+
+                }
+
+                /// error trap return forcing different return codes
+                if(hasErrors)
+                {
+                    var exceptionResult = HandleResponseErrors
+                        .FormatControllerErrors(500, null, processOperationsResponse, verboseErrors);
+
+                    return exceptionResult;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("ErrorSourceMethod", MethodBase.GetCurrentMethod().DeclaringType.FullName);
+                return HandleResponseErrors.FormatControllerErrors(500, ex, null, verboseErrors);
+            }
+
+            return new ObjectResult(processOperationsResponse);
+        }
+    }
+}
+]]>
+</code>
